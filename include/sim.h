@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <memory.h>
+#include <stdio.h>
 #include "common.h"
 #include "utils.h"
 #include "sim_kinds.h"
@@ -24,6 +25,15 @@ struct chunk {
     uint8_t updated[CHUNK_AREA];
     struct chunk *neighbours[8];    // Pointers to moore neighbours
     uint8_t flags;
+};
+
+// Moore neighbor offset for within a chunk
+enum neighbor_offset {
+    nbr_ul =  CHUNK_SIZE-1, nbr_u =  CHUNK_SIZE, nbr_ur =  CHUNK_SIZE+1,
+     
+     nbr_l = -1,                                  nbr_r =  1,
+
+    nbr_dl = -CHUNK_SIZE-1, nbr_d = -CHUNK_SIZE, nbr_dr = -CHUNK_SIZE+1,
 };
 
 static const struct cell EMPTY_CELL = { .kind = 0, .states = 0, .data = 0 };

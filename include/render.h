@@ -5,6 +5,7 @@
 #include "glad/glad.h"
 #include "common.h"
 #include "sim.h"
+#include "sim_kinds.h"
 
 
 static const float SCREEN_QUAD[16] = {

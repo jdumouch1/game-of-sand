@@ -1,5 +1,6 @@
 #include "../include/input.h"
 
+static struct input_globals input;
 struct input_globals *get_input_globals(){
     return &input;
 }

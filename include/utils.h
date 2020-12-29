@@ -4,4 +4,4 @@
 
 void ortho(float *matrix, int left, int right, int bottom, int top);
 
-void shuffle(size_t *arr, size_t n);
+void shuffle(int *arr, size_t n);

@@ -12,11 +12,11 @@ void ortho(float *matrix, int left, int right, int bottom, int top){
 }
 
 
-void shuffle(size_t *arr, size_t n) {
+void shuffle(int *arr, size_t n) {
     if (n <=1) { return; }
     for (size_t i = 0; i < n; i++){
         size_t rand_elem = i + rand() / (RAND_MAX / (n-i) + 1);
-        size_t tmp = arr[rand_elem];
+        int tmp = arr[rand_elem];
         arr[rand_elem] = arr[i];
         arr[i] = tmp;
     }

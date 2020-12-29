@@ -6,10 +6,11 @@ void renderer_load_chunk(struct render_data *r, struct chunk *c){
     
     GLubyte *pixels = calloc(CHUNK_AREA * 4, sizeof(GLubyte));
     for (size_t i = 0; i<CHUNK_AREA * 4; i+=4){
-        pixels[i + 0] = c->mesh[i/4].kind;
-        pixels[i + 1] = c->mesh[i/4].kind;
-        pixels[i + 2] = c->mesh[i/4].kind;
-        pixels[i + 3] = 255;
+        int kind = c->mesh[i/4].kind;
+        pixels[i+0] = (kinds[kind].color>>16);
+        pixels[i+1] = (kinds[kind].color>>8) & 0xFF;
+        pixels[i+2] = (kinds[kind].color) & 0xFF;
+        pixels[i+3] = 255;
     }
 
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, CHUNK_SIZE, CHUNK_SIZE, 

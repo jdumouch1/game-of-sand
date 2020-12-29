@@ -67,14 +67,8 @@ int main() {
      
     struct universe u;
     u.grid = calloc(1, sizeof(struct chunk));
-
-
-    struct uvec2 pos = { .x = CHUNK_SIZE/2, .y = CHUNK_SIZE/2 };
-    for (size_t i = 0; i < 10; i++){
-        pos.y++;
-        u.grid[0].mesh[uvec2_to_id(&pos)].kind = 200;
-    }
-
+        
+    printf("kind_sand: %d, color: %u\n", kind_sand, kinds[kind_sand].color);
 
     size_t fps = 0;
     double last_fps_post = 0.0;
@@ -91,11 +85,11 @@ int main() {
         if (input->mouse_btns[GLFW_MOUSE_BUTTON_1] == GLFW_PRESS){
             for (int y = 0; y < 9; y++) {
                 for (int x = 0; x < 9; x++){
-                    if (rand() % 10) { continue; }
+                    if (rand() % 5) { continue; }
                     struct uvec2 pos = input->mouse_pos;
                     pos.x+=x; pos.y+=y;
                     size_t id = uvec2_to_id(&pos);
-                    u.grid[0].mesh[id].kind = (rand()+50) % 255;
+                    u.grid[0].mesh[id].kind = kind_sand;
                 }
             }
         }
