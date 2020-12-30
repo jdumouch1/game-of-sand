@@ -8,7 +8,7 @@ int init_gfx(GLFWwindow **window){
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
     
-    *window = glfwCreateWindow(CHUNK_SIZE, CHUNK_SIZE, 
+    *window = glfwCreateWindow(CHUNK_SIZE*2, CHUNK_SIZE*2, 
                                     "Game of Sand", NULL, NULL);
     if (!window){
         fprintf( stderr, "Failed to create GLFW window.\n");
@@ -23,7 +23,7 @@ int init_gfx(GLFWwindow **window){
     // TODO: compile all shaders
 
     glClearColor(0.2, 0.2, 0.2, 1.0);
-    glViewport(0, 0, CHUNK_SIZE, CHUNK_SIZE);
+    glViewport(0, 0, CHUNK_SIZE*2, CHUNK_SIZE*2);
    
     // Event callbacks
     glfwSetKeyCallback(*window, input_key_callback);
@@ -85,11 +85,12 @@ int main() {
         if (input->mouse_btns[GLFW_MOUSE_BUTTON_1] == GLFW_PRESS){
             for (int y = 0; y < 9; y++) {
                 for (int x = 0; x < 9; x++){
-                    if (rand() % 5) { continue; }
                     struct uvec2 pos = input->mouse_pos;
-                    pos.x+=x; pos.y+=y;
+                    pos.x /= 2; pos.y /= 2;
+                    pos.x += x; pos.y += y;
                     size_t id = uvec2_to_id(&pos);
-                    u.grid[0].mesh[id].kind = kind_sand;
+                    u.grid[0].mesh[id].kind = 1;
+                    u.grid[0].mesh[id].data = 0;
                 }
             }
         }
@@ -98,7 +99,7 @@ int main() {
             memset(&u.grid[0], 0, sizeof(struct chunk));
         }
         
-        if (frame_since_sim >= 1/SIM_SPEED){
+        if (frame_since_sim >= 1.0/SIM_SPEED){
             frame_since_sim = 0.0;
             chunk_update(&u.grid[0]);
             renderer_load_chunk(&r, &u.grid[0]);
@@ -108,7 +109,7 @@ int main() {
         renderer_draw(&r);
         glfwSwapBuffers(window);
         
-        glfwWaitEventsTimeout(1.0/60.0);
+        glfwPollEvents();
     }
     
     close_glfw(&window);

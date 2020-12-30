@@ -10,7 +10,22 @@
 #define CHUNK_AREA (CHUNK_SIZE * CHUNK_SIZE)
 #define POINT_SIZE (1<<POINT_SCALE)
 
-#define SIM_SPEED 0.5
+#define SIM_SPEED 0.25
+
+#define TGL_FLAG(n, f) ((n) ^= (f))
+#define SET_FLAG(n, f) ((n) |= (f))
+#define CLR_FLAG(n, f) ((n) &= ~(f))
+#define CHK_FLAG(n, f) ((n) & (f))
+
+#define min(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+       _a < _b ? _a : _b; })
+
+#define max(a,b) \
+    ({ __typeof__ (a) _a = (a); \
+       __typeof__ (b) _b = (b); \
+       _a > _b ? _a : _b; })
 
 /*
 static const size_t CHUNK_SCALE = 9;

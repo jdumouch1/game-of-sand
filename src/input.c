@@ -21,8 +21,8 @@ void input_key_callback(GLFWwindow *window, int key,
 }
 
 void input_cursor_pos_callback(GLFWwindow *window, double xpos, double ypos){
-    input.mouse_pos.x = (uint16_t) xpos;
-    input.mouse_pos.y = (uint16_t) CHUNK_SIZE-ypos;
+    input.mouse_pos.x = max(min((uint16_t)(xpos), CHUNK_SIZE*2), 0);
+    input.mouse_pos.y = min(max((uint16_t) (CHUNK_SIZE*2)-ypos, 0), CHUNK_SIZE*2);
 }
 
 void input_mouse_button_callback(GLFWwindow *window, int button, 
