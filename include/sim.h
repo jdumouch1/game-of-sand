@@ -16,11 +16,14 @@
 #define CELL_VARIANT(n)         ((((n) >> 1) & 0x3))
 
 #define CELL_SETTLED_FLAG  0x01
-// Data packing:
+#define CELL_STATIC_FLAG   0x08
+// Data packing (bits):
 // 0        : Settled Flag
 // 1 to 2   : Variant (range: 0 to 3)
-// 3-6      : Reserved
+// 3        : Static
+// 4,5,6    : Reserved
 // 7-15     : Velocity (range: 0 to 15)
+
 struct cell {
     uint16_t kind;
     uint16_t data;

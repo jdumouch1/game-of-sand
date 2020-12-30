@@ -5,6 +5,7 @@ enum kind {
     kind_air = 0,
     kind_sand,
     kind_water,
+    kind_wall
 };
 
 struct kind_property {
@@ -39,11 +40,11 @@ static const struct kind_property kinds[] = {
         .viscosity = 64,
     },
 
-    // 3: Gas
+    // 3: Wall
     {
-        .color = 0xF04040,
-        .density = 8,
-        .dispersion = 255,
-        .viscosity = 0,
+        .color = 0xFAFAFA,
+        .density = 255,
+        .dispersion = 0,
+        .viscosity = 255,
     },
 };

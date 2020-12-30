@@ -1,6 +1,22 @@
 #include "../include/input.h"
 
+struct input_hooks {
+    void (**mouse_btn_hook)();
+    int num_mb_hooks;
+
+    void (**scroll_hook)();
+    int num_scroll_hooks;
+};
+
 static struct input_globals input;
+static struct input_hooks input_hooks = {
+    .mouse_btn_hook = NULL,
+    .num_mb_hooks = 0,
+
+    .scroll_hook = NULL,
+    .num_scroll_hooks = 0,
+};
+
 struct input_globals *get_input_globals(){
     return &input;
 }
@@ -29,9 +45,46 @@ void input_mouse_button_callback(GLFWwindow *window, int button,
                                  int action, int mods){
     if (button > 2) {return;}
     input.mouse_btns[button] = action;
+
+    for (int i = 0; i < input_hooks.num_mb_hooks; i++){
+        input_hooks.mouse_btn_hook[i]();
+    }
+}
+
+void input_scroll_callback(GLFWwindow *window, double xoffset, double yoffset){
+    input.scroll = (int) yoffset;
+    for (int i = 0; i < input_hooks.num_scroll_hooks; i++){
+        input_hooks.scroll_hook[i]();
+    }
 }
 
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic pop
+
+void input_add_hook(void (*fn)(), enum input_hook hook_type){
+    int *count;
+    void (***hooks)();
+
+    switch (hook_type){
+        case hook_mouse_btn:
+            count = &input_hooks.num_mb_hooks;
+            hooks = &input_hooks.mouse_btn_hook;
+            break;
+        case hook_scroll:
+            count = &input_hooks.num_scroll_hooks;
+            hooks = &input_hooks.scroll_hook;
+    }
+
+    void (**funcs)() = calloc((*count)+1, sizeof(fn));
+    if (count){
+        memcpy(funcs, *hooks, sizeof(fn)* (*count));
+        free(*hooks);
+    }
+    *hooks = funcs;
+    *hooks[*count] = fn;
+    *count += 1;
+
+
+}
 
 
