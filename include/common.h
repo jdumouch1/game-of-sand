@@ -10,19 +10,19 @@
 #define CHUNK_AREA (CHUNK_SIZE * CHUNK_SIZE)
 #define POINT_SIZE (1<<POINT_SCALE)
 
-#define SIM_SPEED 1
+#define SIM_SPEED 0.5
 
 #define TGL_FLAG(n, f) ((n) ^= (f))
 #define SET_FLAG(n, f) ((n) |= (f))
 #define CLR_FLAG(n, f) ((n) &= ~(f))
 #define CHK_FLAG(n, f) ((n) & (f))
 
-#define min(a,b) \
+#define min(a,b) __extension__ \
     ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
        _a < _b ? _a : _b; })
 
-#define max(a,b) \
+#define max(a,b) __extension__ \
     ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
        _a > _b ? _a : _b; })

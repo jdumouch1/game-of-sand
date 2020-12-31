@@ -2,7 +2,8 @@
 #include <GLFW/glfw3.h>
 
 static int brush_size = 4;
-
+static int brush_kind = kind_sand;
+static struct input_globals *input;
 int init_gfx(GLFWwindow **window){
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -57,6 +58,75 @@ void on_scroll(){
     printf("brush_size: %d\n", brush_size);
 }
 
+void on_key(int key, int action){
+    if (action != GLFW_PRESS){return;}
+    switch (key){
+    case GLFW_KEY_R:
+        {
+            enum render_mode rm = renderer_get_mode()+1;
+            if (rm >= 4){rm = 0;}
+            renderer_set_mode(rm);
+
+            printf("Render mode: ");
+            switch (rm){
+            case render_kinds:
+                printf("default\n");
+                break;
+            case render_flags:
+                printf("flags\n");
+                break;
+            case render_density:
+                printf("density\n");
+                break;
+            case render_velocity:
+                printf("velocity\n");
+                break;
+
+
+            default:
+                printf("Invalid.\n");
+            }
+        }
+        break;
+    case GLFW_KEY_0:
+        brush_kind = kind_air;
+        goto print_brush;
+    case GLFW_KEY_1:
+        brush_kind = kind_sand;
+        goto print_brush;
+    case GLFW_KEY_2:
+        brush_kind = kind_water;
+        goto print_brush;
+    case GLFW_KEY_3:
+        brush_kind = kind_gas;
+        goto print_brush;
+    default:
+        break;
+    }
+
+    return;
+print_brush:
+    printf("Brush kind: %s\n", kinds[brush_kind].name);
+}
+
+void paint_at(struct chunk *c, struct uvec2 *pos, 
+              uint16_t kind, uint16_t data){
+    for (size_t y = 0; y < brush_size; y++){
+        for (size_t x = 0; x < brush_size; x++){
+            struct vec2 draw_pos = {
+                .x = (int)(pos->x/2) + x - brush_size/2,
+                .y = (int)(pos->y/2) + y - brush_size/2,
+            };
+            if (draw_pos.x < 0 || draw_pos.x > CHUNK_SIZE-1
+                || draw_pos.y < 0 || draw_pos.y > CHUNK_SIZE-1) { 
+                continue; 
+            }
+            size_t id = draw_pos.x + (draw_pos.y << CHUNK_SCALE);
+            set_cell(c, id, kind, data);
+        }
+    }
+}
+
 int main() {
     srand(5138008);
     // Initialize graphics
@@ -65,8 +135,9 @@ int main() {
         return -1;
     }
     
-    struct input_globals *input = get_input_globals();
-    input_add_hook(&on_scroll, hook_scroll);    
+    input = get_input_globals();
+    input_add_hook(&on_scroll, hook_scroll);   
+    input_add_hook(&on_key, hook_key);
     // Compile and link shaders
     GLuint shader_program;
     shader_program_from_files(&shader_program, "assets/vert.glsl", 
@@ -77,7 +148,7 @@ int main() {
 
     struct universe u;
     u.grid = calloc(1, sizeof(struct chunk));
-        
+    u.grid[0].flags = 1; 
     printf("kind_sand: %d, color: %u\n", kind_sand, kinds[kind_sand].color);
 
     int access_order[CHUNK_AREA];
@@ -85,7 +156,7 @@ int main() {
         access_order[i] = i;
     }
     shuffle(access_order, CHUNK_AREA);
-
+    
     size_t fps = 0;
     double last_fps_post = 0.0;
     double frame_since_sim = 0.0;
@@ -94,51 +165,37 @@ int main() {
         frame_since_sim++;
         if (glfwGetTime() - last_fps_post >= 1.0){
             last_fps_post = glfwGetTime();
-            printf("[FPS] %lu\n", fps);
+            //printf("[FPS] %lu\n", fps);
             fps = 0;
         }
-
+        
         struct uvec2 pos = input->mouse_pos;
         pos.x/=2; pos.y/=2;
 
         if (input->mouse_btns[GLFW_MOUSE_BUTTON_1] == GLFW_PRESS){
-            for (int y = 0; y < brush_size; y++) {
-                for (int x = 0; x < brush_size; x++){
-                    if (rand() % 3) { continue; }
-                    struct uvec2 spawn_pos = {
-                        .x = pos.x-brush_size/2 + x,
-                        .y = pos.y-brush_size/2 + y,
-                    };
-                    size_t id = uvec2_to_id(&spawn_pos);
-                    u.grid[0].mesh[id].kind = 1;
-                    u.grid[0].mesh[id].data = 0;
-                }
-            }
+            paint_at(&u.grid[0], &input->mouse_pos, brush_kind, 0);   
         }
         if (input->mouse_btns[GLFW_MOUSE_BUTTON_2] == GLFW_PRESS){
-            for (int y = 0; y < brush_size; y++) {
-                for (int x = 0; x < brush_size; x++){
-                    struct uvec2 spawn_pos = {
-                        .x = pos.x-brush_size/2 + x,
-                        .y = pos.y-brush_size/2 + y,
-                    };
-                    size_t id = uvec2_to_id(&spawn_pos);
-                    u.grid[0].mesh[id].kind = kind_wall;
-                    SET_FLAG(u.grid[0].mesh[id].data, CELL_STATIC_FLAG);
-                }
-            }
+            paint_at(&u.grid[0], &input->mouse_pos, 
+                     brush_kind, CELL_STATIC_FLAG);
 
         }
 
 
         if (input->key[GLFW_KEY_Q] == GLFW_PRESS){
             memset(&u.grid[0], 0, sizeof(struct chunk));
+            u.grid[0].flags = 1;
+        }else if(input->key[GLFW_KEY_R] == GLFW_PRESS){
+            u.grid[0].flags = 1;
         }
         
         if (frame_since_sim >= 1.0/SIM_SPEED){
             frame_since_sim = 0.0;
-            chunk_update(&u.grid[0]);
-            renderer_load_chunk(&r, &u.grid[0]);
+            if (u.grid[0].flags){
+                shuffle(access_order, CHUNK_SIZE);
+                chunk_update(&u.grid[0], access_order);
+                renderer_load_chunk(&r, &u.grid[0]);
+            }
         }
 
         glClear(GL_COLOR_BUFFER_BIT);

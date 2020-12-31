@@ -3,12 +3,13 @@
 
 enum kind {
     kind_air = 0,
-    kind_sand,
-    kind_water,
-    kind_wall
+    kind_sand = 1,
+    kind_water = 2,
+    kind_gas = 3,
 };
 
 struct kind_property {
+    char name[8];
     uint32_t color;
     uint8_t density;
     uint8_t dispersion;
@@ -18,6 +19,7 @@ struct kind_property {
 static const struct kind_property kinds[] = {
     // 0: Air
     { 
+        .name = "Air",
         .color = 0x202020, 
         .density = 16,
         .dispersion = 255,
@@ -26,6 +28,7 @@ static const struct kind_property kinds[] = {
 
     // 1: Sand
     { 
+        .name = "Sand",
         .color = 0xF2D2A9, 
         .density = 128, 
         .dispersion = 0,
@@ -34,17 +37,19 @@ static const struct kind_property kinds[] = {
 
     // 2: Water
     {   
+        .name = "Water",
         .color = 0x0000FF,
         .density = 64,
-        .dispersion = 128,
+        .dispersion = 200,
         .viscosity = 64,
     },
 
-    // 3: Wall
+    // 3: Gas
     {
-        .color = 0xFAFAFA,
-        .density = 255,
-        .dispersion = 0,
-        .viscosity = 255,
+        .name = "Gas",
+        .color = 0xC0FFC0,
+        .density = 8,
+        .dispersion = 255,
+        .viscosity = 0,
     },
 };

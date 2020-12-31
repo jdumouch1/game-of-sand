@@ -19,21 +19,22 @@ inline size_t uvec2_to_id(struct uvec2 *v){
     // y << CHUNK_SCALE
 }
 
-void chunk_update(struct chunk *c){
+void chunk_update(struct chunk *c, int *order){
     // Reset the cell updated states
-    memset(&c->updated, 0, sizeof(c->updated));
+    memset(&c->moved, 0, sizeof(c->moved));
     // Set the chunk to inactive, in case no cells are updated.
     CLR_FLAG(c->flags, CHUNK_ACTIVE_FLAG);
-    for (int i = 0; i<CHUNK_AREA; i++){
+    for (size_t i = 0; i < CHUNK_AREA; i++){
+        int selected_id = order[i];
         // generate every number up to n, with a pseudo-random offset
-        struct cell *cell = &c->mesh[i];
-
+        struct cell *cell = &c->mesh[selected_id];
         // Check if the cell exists and has not settled
-        if (cell->kind && 
-            !c->updated[i] &&
-            !CHK_FLAG(cell->data, CELL_STATIC_FLAG)){
-
-            cell_update(c, i);
+        if (!c->moved[selected_id]
+            && !CHK_FLAG(cell->data, CELL_SETTLED_FLAG)
+            && !CHK_FLAG(cell->data, CELL_STATIC_FLAG)){
+            struct uvec2 p;
+            id_to_uvec2(&p, selected_id);
+            cell_update(c, selected_id);
             
             // Set that has been an update in this chunk
             SET_FLAG(c->flags, CHUNK_ACTIVE_FLAG);
@@ -43,67 +44,160 @@ void chunk_update(struct chunk *c){
 
 int cell_can_move(struct chunk *c, size_t id, int delta){
     int can_move = 1;
-    if (id < CHUNK_SIZE) { 
+    // Bounds check
+    if ((int)(id)+delta < 0 || id+delta > CHUNK_AREA){ 
         can_move = 0;
         goto out;
     }
-    
     size_t to = id + delta;
-    if (c->updated[to] || c->mesh[to].kind){
+    if (c->moved[to]){
         can_move = 0;
         goto out;
     }
-
+    uint8_t from_density = kinds[c->mesh[id].kind].density; 
+    uint8_t to_density = kinds[c->mesh[to].kind].density;
+    if (to_density >= from_density){
+        can_move = 0;
+        goto out;
+    }
 out:
     return can_move;
+}
+
+// TODO: Optimize
+int in_x_bounds(size_t id, int delta){
+    int is_left = delta/CHUNK_SIZE != 0;
+    if ((is_left && (id%CHUNK_SIZE) == 0) 
+        || (!is_left && (id%CHUNK_SIZE)==CHUNK_SIZE-1)){
+        return 0;
+    
+    }
+
+    return 1;
+}
+
+size_t cell_move(struct chunk *c, size_t from, size_t to){
+    struct cell *cell = &c->mesh[from];
+    struct cell tmp = c->mesh[from];
+    struct cell *new_cell = &c->mesh[to];
+    if (cell->kind == new_cell->kind){}
+    memcpy(cell, new_cell, sizeof(struct cell));
+    memcpy(new_cell, &tmp, sizeof(struct cell));
+    cell = new_cell;
+
+    if (from < CHUNK_AREA-CHUNK_SIZE){
+        CLR_FLAG(c->mesh[from + off_u].data, CELL_SETTLED_FLAG); 
+        CLR_FLAG(c->mesh[from + off_ul].data, CELL_SETTLED_FLAG); 
+        CLR_FLAG(c->mesh[from + off_ur].data, CELL_SETTLED_FLAG);
+    }
+    if (from < CHUNK_AREA){
+        CLR_FLAG(c->mesh[from + off_r].data, CELL_SETTLED_FLAG);
+    }
+    if (from > -1){
+        CLR_FLAG(c->mesh[from + off_l].data, CELL_SETTLED_FLAG);
+    }
+    if (from > CHUNK_SIZE){
+        CLR_FLAG(c->mesh[from + off_d].data, CELL_SETTLED_FLAG);
+        CLR_FLAG(c->mesh[from + off_dr].data, CELL_SETTLED_FLAG);
+        CLR_FLAG(c->mesh[from + off_dl].data, CELL_SETTLED_FLAG);
+    }
+    return to;
 }
 
 void cell_update(struct chunk *c, size_t id){
     struct cell *cell = &c->mesh[id];
     int velocity = CELL_VELOCITY(cell->data);
-    int travel = 1;
+    int travel = velocity+1;
 
+travel_start:
     while (travel){
-        if (id < CHUNK_SIZE) { goto no_move; }
-        int new_id;
+        if (id < CHUNK_SIZE) { goto settled; }
         
         // First try moving down
         if (cell_can_move(c, id, off_d)){
-            new_id = (int)id+off_d;
-        }
-        // Otherwise, try moving down and to the sides
-        else {
-            int deltas[2] = { off_dl, off_dr };
-            shuffle(deltas, 2);
             
-            if (cell_can_move(c, id, deltas[0])){
-                new_id = id+deltas[0];
-            }
-            else if (cell_can_move(c, id, deltas[1])){
-                new_id = id+deltas[1];
-            }else{
-                goto no_move;
-            }
+            id = cell_move(c, id, id + off_d);
+            travel--;
+            continue;
         }
         
-        struct cell tmp = *cell;
-        struct cell *new_cell = &c->mesh[new_id];
-        memcpy(cell, new_cell, sizeof(struct cell));
-        memcpy(new_cell, &tmp, sizeof(struct cell));
+        // Try down and to the sides
+        int deltas[2] = { off_dl, off_dr };
+        shuffle(deltas, 2);
+        for (int i = 0; i < 2; i++){
+            if (cell_can_move(c, id, deltas[i]) 
+                && in_x_bounds(id, deltas[i])){
+                
+                id = cell_move(c, id, id+deltas[i]);
+                travel--;
+                goto travel_start;
+            }
+        }
+        // Try to disperse (left and right)
+        uint8_t dispersion = kinds[c->mesh[id].kind].dispersion;
+        if (dispersion){
+            deltas[0] = off_r; 
+            deltas[1] = off_l;
+            shuffle(deltas, 2);
+            int moved = 0;
+            for (int i = 0; i < 2; i++){
+                if (cell_can_move(c, id, deltas[i])
+                    && in_x_bounds(id, deltas[i])){
+                
+                    id = cell_move(c, id, id+deltas[i]);
+                    travel--;
+                    goto travel_start;
+                }
+            }
+            goto unsettled;
+        }
 
-        cell = new_cell;
-        id = new_id;
-        travel=0;
+        goto settled;
     }
-        
+    
+    // Add the acceleration due to gravity
+    velocity = CELL_VELOCITY(c->mesh[id].data);
+    if (velocity < 15){
+        CELL_VELOCITY_SET(c->mesh[id].data, velocity+1);
+    }
 
+    c->moved[id] = 1;
     return;
 
-no_move:
-    // Stop, settle and mark the cell as updated
+
+settled:
     CELL_VELOCITY_CLR(c->mesh[id].data);
     SET_FLAG(c->mesh[id].data, CELL_SETTLED_FLAG);
-    c->updated[id] = 1;
+unsettled:
+    // Stop, settle and mark the cell as not moved
+    c->moved[id] = 0;
     return;
 }
+
+
+void set_cell(struct chunk *c, size_t id, uint16_t kind, uint16_t data){
+    c->flags = 1;
+
+    c->mesh[id].kind = kind;
+    c->mesh[id].data = data;
+
+    if (id < CHUNK_AREA-CHUNK_SIZE){
+        CLR_FLAG(c->mesh[id + off_u].data, CELL_SETTLED_FLAG); 
+        CLR_FLAG(c->mesh[id + off_ul].data, CELL_SETTLED_FLAG); 
+        CLR_FLAG(c->mesh[id + off_ur].data, CELL_SETTLED_FLAG);
+    }
+    if (id < CHUNK_AREA){
+        CLR_FLAG(c->mesh[id + off_r].data, CELL_SETTLED_FLAG);
+    }
+    if (id > 0){
+        CLR_FLAG(c->mesh[id + off_l].data, CELL_SETTLED_FLAG);
+    }
+    if (id > CHUNK_SIZE){
+        CLR_FLAG(c->mesh[id + off_d].data, CELL_SETTLED_FLAG);
+        CLR_FLAG(c->mesh[id + off_dr].data, CELL_SETTLED_FLAG);
+        CLR_FLAG(c->mesh[id + off_dl].data, CELL_SETTLED_FLAG);
+    }
+
+}
+
 

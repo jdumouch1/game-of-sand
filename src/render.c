@@ -1,17 +1,67 @@
 #include "../include/render.h"
 
+static enum render_mode current_mode = render_kinds;
+void renderer_set_mode(enum render_mode r){
+    current_mode = r;
+}
+enum render_mode renderer_get_mode(){
+    return current_mode;
+}
+
 void renderer_load_chunk(struct render_data *r, struct chunk *c){
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, r->gl_tex);
     
     GLubyte *pixels = calloc(CHUNK_AREA * 4, sizeof(GLubyte));
     for (size_t i = 0; i<CHUNK_AREA * 4; i+=4){
-        int kind = c->mesh[i/4].kind;
-        pixels[i+0] = (kinds[kind].color>>16);
-        pixels[i+1] = ((kinds[kind].color>>8) & 0xFF);
-        pixels[i+2] = ((kinds[kind].color) & 0xFF);
+        uint8_t r_channel, g_channel, b_channel;
+        switch (current_mode) {
+        case render_kinds:
+            {
+                uint32_t color = kinds[c->mesh[i/4].kind].color;
+                r_channel = (color >> 16);
+                g_channel = (color >>  8) & 0xFF;
+                b_channel = (color >>  0) & 0xFF;
+            }
+            break;
+        case render_flags:
+            {
+                uint8_t settled = CHK_FLAG(c->mesh[i/4].data, 
+                                           CELL_SETTLED_FLAG);
+                uint8_t static_ = CHK_FLAG(c->mesh[i/4].data, 
+                                           CELL_STATIC_FLAG);
+                r_channel = (!settled)*255;
+                g_channel = static_*255;
+                b_channel = 0;
+            }
+            break;
+        case render_density:
+            {
+                uint8_t density = kinds[c->mesh[i/4].kind].density;
+                r_channel = density;
+                g_channel = density;
+                b_channel = density;
+            }
+            break;
+        case render_velocity:
+            {
+                uint8_t vel = CELL_VELOCITY(c->mesh[i/4].data);
+                r_channel = vel * (255/15);
+                g_channel = 0;
+                b_channel = 0;
+            }
+            break;
+        default:
+            r_channel = 0;
+            g_channel = 0;
+            b_channel = 0;
+            break;
+        }
+        pixels[i+0] = r_channel;
+        pixels[i+1] = g_channel;
+        pixels[i+2] = b_channel;
         pixels[i+3] = 255;
-    }
+}
 
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, CHUNK_SIZE, CHUNK_SIZE, 
                     GL_RGBA, GL_UNSIGNED_BYTE, pixels);

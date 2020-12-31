@@ -6,6 +6,7 @@
 enum input_hook {
     hook_mouse_btn,
     hook_scroll,
+    hook_key,
 };
 
 struct input_globals {

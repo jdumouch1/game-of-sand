@@ -28,8 +28,19 @@ struct render_data {
     GLuint gl_tex;
 };
 
+enum render_mode {
+    render_kinds,
+    render_flags,
+    render_density,
+    render_velocity,
+    render_updated,
+};
+
 
 void renderer_load_chunk(struct render_data *r, struct chunk *c); 
 int renderer_init(struct render_data *r, GLuint program);
 void renderer_draw(struct render_data *r);
+
+void renderer_set_mode(enum render_mode r);
+enum render_mode renderer_get_mode();
 

@@ -36,7 +36,7 @@ struct universe {
 #define CHUNK_ACTIVE_FLAG   0x01
 struct chunk {
     struct cell mesh[CHUNK_AREA];   // Every cell within the chunk
-    uint8_t updated[CHUNK_AREA];
+    uint8_t moved[CHUNK_AREA];
     struct chunk *neighbours[8];    // Pointers to moore neighbours
     uint8_t flags;
 };
@@ -56,6 +56,8 @@ static const struct cell EMPTY_CELL = { .kind = 0, .data = 0};
 void id_to_uvec2(struct uvec2 *out, size_t local_id);
 size_t uvec2_to_id(struct uvec2 *v);
 
-void chunk_update(struct chunk *c);
+void chunk_update(struct chunk *c, int *order);
 void chunk_change_cell(struct chunk *c, size_t id, 
                        uint16_t kind, uint16_t data);
+
+void set_cell(struct chunk *c, size_t id, uint16_t kind, uint16_t data);
