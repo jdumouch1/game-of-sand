@@ -100,6 +100,9 @@ void on_key(int key, int action){
     case GLFW_KEY_3:
         brush_kind = kind_gas;
         goto print_brush;
+    case GLFW_KEY_4:
+        brush_kind = kind_stone;
+        goto print_brush;
     default:
         break;
     }
@@ -110,9 +113,9 @@ print_brush:
 }
 
 void paint_at(struct chunk *c, struct uvec2 *pos, 
-              uint16_t kind, uint16_t data){
-    for (size_t y = 0; y < brush_size; y++){
-        for (size_t x = 0; x < brush_size; x++){
+              uint16_t kind, uint16_t flags){
+    for (int y = 0; y < brush_size; y++){
+        for (int x = 0; x < brush_size; x++){
             struct vec2 draw_pos = {
                 .x = (int)(pos->x/2) + x - brush_size/2,
                 .y = (int)(pos->y/2) + y - brush_size/2,
@@ -122,7 +125,11 @@ void paint_at(struct chunk *c, struct uvec2 *pos,
                 continue; 
             }
             size_t id = draw_pos.x + (draw_pos.y << CHUNK_SCALE);
-            set_cell(c, id, kind, data);
+            struct cell cell_data = {
+                .kind = kind,
+                .flags = flags,
+            };
+            set_cell(c, id, cell_data);
         }
     }
 }
@@ -149,7 +156,6 @@ int main() {
     struct universe u;
     u.grid = calloc(1, sizeof(struct chunk));
     u.grid[0].flags = 1; 
-    printf("kind_sand: %d, color: %u\n", kind_sand, kinds[kind_sand].color);
 
     int access_order[CHUNK_AREA];
     for (size_t i = 0; i < CHUNK_AREA; i++){
@@ -180,7 +186,6 @@ int main() {
                      brush_kind, CELL_STATIC_FLAG);
 
         }
-
 
         if (input->key[GLFW_KEY_Q] == GLFW_PRESS){
             memset(&u.grid[0], 0, sizeof(struct chunk));

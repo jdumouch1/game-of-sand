@@ -10,7 +10,7 @@
 #define CHUNK_AREA (CHUNK_SIZE * CHUNK_SIZE)
 #define POINT_SIZE (1<<POINT_SCALE)
 
-#define SIM_SPEED 0.5
+#define SIM_SPEED 1
 
 #define TGL_FLAG(n, f) ((n) ^= (f))
 #define SET_FLAG(n, f) ((n) |= (f))
@@ -35,14 +35,14 @@ static const size_t CHUNK_SIZE = (1<<CHUNK_SCALE);
 static const size_t CHUNK_AREA = (CHUNK_SIZE * CHUNK_SIZE);
 static const size_t POINT_SIZE = (1<<POINT_SCALE);
 */
-struct vec2 {
+typedef struct vec2 {
     int16_t x;
     int16_t y;
-};
+} vec2;
 
-struct uvec2 {
+typedef struct uvec2 {
     uint16_t x;
     uint16_t y;
-};
+} uvec2;
 
 

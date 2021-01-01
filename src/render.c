@@ -26,9 +26,9 @@ void renderer_load_chunk(struct render_data *r, struct chunk *c){
             break;
         case render_flags:
             {
-                uint8_t settled = CHK_FLAG(c->mesh[i/4].data, 
+                uint8_t settled = CHK_FLAG(c->mesh[i/4].flags, 
                                            CELL_SETTLED_FLAG);
-                uint8_t static_ = CHK_FLAG(c->mesh[i/4].data, 
+                uint8_t static_ = CHK_FLAG(c->mesh[i/4].flags, 
                                            CELL_STATIC_FLAG);
                 r_channel = (!settled)*255;
                 g_channel = static_*255;
@@ -45,9 +45,9 @@ void renderer_load_chunk(struct render_data *r, struct chunk *c){
             break;
         case render_velocity:
             {
-                uint8_t vel = CELL_VELOCITY(c->mesh[i/4].data);
-                r_channel = vel * (255/15);
-                g_channel = 0;
+                struct cell *cell = &c->mesh[i/4];
+                r_channel = min(255, 15*abs(cell->vx));
+                g_channel = min(255, 15*abs(cell->vy));
                 b_channel = 0;
             }
             break;
