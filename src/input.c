@@ -39,6 +39,7 @@ void input_key_callback(GLFWwindow *window, int key,
         }
     }
 
+    input.key_modifier = mods;
     input.key[key] = action;
 
     for (int i = 0; i < input_hooks.num_key_hooks; i++){

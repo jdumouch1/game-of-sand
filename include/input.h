@@ -13,6 +13,7 @@ struct input_globals {
     struct uvec2 mouse_pos;
     int mouse_btns[3];
     int key[512];
+    int key_modifier;
     int scroll;
 };
 

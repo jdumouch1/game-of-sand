@@ -19,35 +19,58 @@ void renderer_load_chunk(struct render_data *r, struct chunk *c){
         case render_kinds:
             {
                 uint32_t color = kinds[c->mesh[i/4].kind].color;
-                r_channel = (color >> 16);
-                g_channel = (color >>  8) & 0xFF;
-                b_channel = (color >>  0) & 0xFF;
+                uint8_t alt = CHK_FLAG(c->mesh[i/4].flags, CELL_ALTERNATE) > 0;
+                r_channel = (color >> 16) - alt*4;
+                g_channel = ((color >>  8) & 0xFF) - alt*4;
+                b_channel = ((color >>  0) & 0xFF) - alt*4;
+                
+                vec2 ipos = { .x = (i/4) % CHUNK_SIZE, .y = (i/4) / CHUNK_SIZE };
+                vec2 bl = { .x = c->dirt_rect_corners.x % CHUNK_SIZE,
+                            .y = c->dirt_rect_corners.x / CHUNK_SIZE };
+                vec2 tr = { .x = c->dirt_rect_corners.y % CHUNK_SIZE,
+                            .y = c->dirt_rect_corners.y / CHUNK_SIZE };
+            
+                if (ipos.y == bl.y && ipos.x <= tr.x && ipos.x >= bl.x){
+                    r_channel = 255;
+                }
+                if (ipos.x == bl.x && ipos.y <= tr.y && ipos.y >= bl.y){
+                    r_channel = 255;
+                }
+                if (ipos.x == tr.x && ipos.y <= tr.y && ipos.y >= bl.y){
+                    r_channel = 255;
+                }            
+                if (ipos.y == tr.y && ipos.x <= tr.x && ipos.x >= bl.x){
+                    r_channel = 255;
+                }            
             }
             break;
         case render_flags:
             {
                 uint8_t settled = CHK_FLAG(c->mesh[i/4].flags, 
-                                           CELL_SETTLED_FLAG);
+                                           CELL_SETTLED);
                 uint8_t static_ = CHK_FLAG(c->mesh[i/4].flags, 
-                                           CELL_STATIC_FLAG);
-                r_channel = (!settled)*255;
+                                           CELL_STATIC);
+                uint8_t falling = CHK_FLAG(c->mesh[i/4].flags, CELL_FALLING);
+                r_channel = c->mesh[i/4].kind ? settled*255 : 0;
                 g_channel = static_*255;
-                b_channel = 0;
+                b_channel = falling*255;
             }
             break;
         case render_density:
             {
-                uint8_t density = kinds[c->mesh[i/4].kind].density;
-                r_channel = density;
-                g_channel = density;
-                b_channel = density;
+                int8_t density = kinds[c->mesh[i/4].kind].density;
+                uint8_t dcolor = 127 - density;
+
+                r_channel = dcolor;
+                g_channel = dcolor;
+                b_channel = dcolor;
             }
             break;
         case render_velocity:
             {
                 struct cell *cell = &c->mesh[i/4];
-                r_channel = min(255, 15*abs(cell->vx));
-                g_channel = min(255, 15*abs(cell->vy));
+                r_channel = 0;
+                g_channel = min(cell->speed * (255/MAX_SPEED), 255);
                 b_channel = 0;
             }
             break;
