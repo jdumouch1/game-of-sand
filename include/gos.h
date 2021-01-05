@@ -1,13 +1,14 @@
 #pragma once
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "common.h"
-#include "shader.h"
+#include "gfx.h"
 #include "input.h"
-#include "utils.h"
 #include "render.h"
+#include "shader.h"
 #include "sim.h"
+#include "utils.h"
 
+#ifndef COMMON_HEADER_
+#include "common.h"
+#endif

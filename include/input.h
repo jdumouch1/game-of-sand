@@ -17,19 +17,13 @@ struct input_globals {
     int scroll;
 };
 
+struct input_callbacks {
+    void (*key) (GLFWwindow*, int, int, int, int);
+    void (*cursor_pos) (GLFWwindow*, double, double);
+    void (*mouse_button) (GLFWwindow*, int, int, int);
+    void (*input_scroll) (GLFWwindow*, double, double);
+};
 
-struct input_globals *get_input_globals();
-
-
-void input_key_callback(GLFWwindow *window, int key, int scancode,
-                        int action, int mods);
-
-void input_cursor_pos_callback(GLFWwindow *window, double xpos, double ypos);
-
-void input_mouse_button_callback(GLFWwindow *window, int button,
-                                 int action, int mods);
-void input_scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
-
-
-
+const struct input_callbacks *input_get_callbacks();
+struct input_globals *input_get_globals();
 void input_add_hook(void (*fn)(), enum input_hook);

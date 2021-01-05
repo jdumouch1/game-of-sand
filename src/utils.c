@@ -1,6 +1,6 @@
 #include "../include/utils.h"
 
-void ortho(float *matrix, int left, int right, int bottom, int top){
+void linalg_ortho(float *matrix, int left, int right, int bottom, int top){
     memset(matrix, 0, sizeof(float) * 16);
 
     matrix[0] = 2.0/(right-left);

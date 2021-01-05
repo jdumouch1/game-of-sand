@@ -1,7 +1,6 @@
 #include "../include/sim.h"
-#include <bits/stdint-uintn.h>
 
-int cell_update(struct chunk *c, size_t id);
+int cell_update(struct chunk *c, size_t *id);
 
 inline void id_to_uvec2(struct uvec2 *out, size_t local_id){
     out->x = local_id % CHUNK_SIZE;
@@ -35,6 +34,21 @@ int32_t fast_abs(int32_t a){
     return (a^tmp) + (tmp & 1); 
 }
 
+void chunk_set_rendered(struct chunk *c, struct render_chunk *rc){
+    if (rc->sim_chunk){
+        // Decouple the old chunk
+        CLR_FLAG(rc->sim_chunk->flags, CHUNK_RENDERED);
+        rc->sim_chunk->render_chunk = NULL;
+    }
+    memset(rc, 0, sizeof(struct render_chunk));
+
+    // Couple the new chunk
+    c->render_chunk = rc;
+    rc->sim_chunk = c;
+    
+    SET_FLAG(c->flags, CHUNK_RENDERED);
+}
+
 void chunk_update(struct chunk *c){
     // Reset the cell updated states
     memset(&c->moved, 0, sizeof(c->moved));
@@ -45,46 +59,35 @@ void chunk_update(struct chunk *c){
 
     int incrementor = flipped_update ? -1 : 1;
     size_t i = flipped_update * (CHUNK_SIZE-1);
-    c->dirt_rect_corners.x = CHUNK_AREA-1;
-    c->dirt_rect_corners.y = 0;
+    if (c->render_chunk){
+        memset(c->render_chunk->cells, 0, sizeof(c->render_chunk->cells));
+        c->render_chunk->cell_count = 0;
+    }
     while (i < CHUNK_AREA){
         struct cell *cell = &c->mesh[i];
+        size_t id = i;
         
-
-        if (!c->moved[i]
+        if (!c->moved[i] 
             && c->mesh[i].kind
             && !CHK_FLAG(cell->flags, CELL_SETTLED)
             && !CHK_FLAG(cell->flags, CELL_STATIC)){
             
-            uvec2 pos = { .x = i % CHUNK_SIZE, .y = i >> CHUNK_SCALE };
-            uvec2 bl = { .x = c->dirt_rect_corners.x % CHUNK_SIZE, 
-                         .y = c->dirt_rect_corners.x >> CHUNK_SCALE };
-            uvec2 tr = { .x = c->dirt_rect_corners.y % CHUNK_SIZE,
-                         .y = c->dirt_rect_corners.y >> CHUNK_SCALE };
-            if (cell_update(c, i)){
-                if (bl.x > pos.x){
-                    bl.x = pos.x;
-                }
-                if (bl.y > pos.y){
-                    bl.y = pos.y;
-                }
-                if (tr.x < pos.x){
-                    tr.x = pos.x;
-                }
-                if (tr.y < pos.y){
-                    tr.y = pos.y;
-                }
-
-                c->dirt_rect_corners.x = bl.x + (bl.y << CHUNK_SCALE);
-                c->dirt_rect_corners.y = tr.x + (tr.y << CHUNK_SCALE);
-            }
+            cell_update(c, &id);
             
             // Set that has been an update in this chunk
             SET_FLAG(c->flags, CHUNK_ACTIVE);
         }
-
+        
+        if (CHK_FLAG(c->flags, CHUNK_RENDERED) &&
+            c->mesh[id].kind){
+            struct render_chunk *rc = c->render_chunk;
+            rc->cells[rc->cell_count++] = (struct render_cell) {
+                .local_id = id,
+                .kind = c->mesh[id].kind,
+            };
+        }
+        
         // Check if 'i' needs to move to the end of a higher row
-    //printf("Moved\n");
         if (flipped_update && !(i % CHUNK_SIZE)){
             // (Current Row + 1) * Row_size = start of next row
             // row_start + row_size = (end of next row+1)
@@ -168,50 +171,50 @@ out:
     return in_bounds;
 }
 
-int cell_update(struct chunk *c, size_t id){
-    if (!c->mesh[id].kind){
-        SET_FLAG(c->mesh[id].flags, CELL_SETTLED);
+int cell_update(struct chunk *c, size_t *id){
+    if (!c->mesh[*id].kind){
+        SET_FLAG(c->mesh[*id].flags, CELL_SETTLED);
         goto stopped;
     }
 
-    int travel = c->mesh[id].speed>>3;
+    int travel = c->mesh[*id].speed>>3;
     if (!travel) {
         travel++;
-        c->mesh[id].speed++;
+        c->mesh[*id].speed++;
         return 0;
     }
     
-    vec2 pos = { .x = id%CHUNK_SIZE, .y = id >> CHUNK_SCALE };
-    const struct kind_property props = kinds[c->mesh[id].kind];
+    vec2 pos = { .x = *id % CHUNK_SIZE, .y = *id >> CHUNK_SCALE };
+    const struct kind_property props = kinds[c->mesh[*id].kind];
 
     int dir = (props.density < 0) - (props.density > 0);
 
-    SET_FLAG(c->mesh[id].flags, CELL_FALLING);
+    SET_FLAG(c->mesh[*id].flags, CELL_FALLING);
 
     while (travel){
-        if (!move_in_bounds(id, 0, dir)){ goto out_of_bounds; }
-        if (cell_can_move_by(c, id, 0, dir)){
-            id = cell_move_by(c, id, 0, dir);
+        if (!move_in_bounds(*id, 0, dir)){ goto out_of_bounds; }
+        if (cell_can_move_by(c, *id, 0, dir)){
+            *id = cell_move_by(c, *id, 0, dir);
             goto moved;
         }
-        CLR_FLAG(c->mesh[id].flags, CELL_FALLING); 
+        CLR_FLAG(c->mesh[*id].flags, CELL_FALLING); 
 
         // Try diagonal movement towards the bias
-        int bias = CHK_FLAG(c->mesh[id].flags, CELL_BIAS) ? 1 : -1;
-        if (!move_in_bounds(id, bias, dir)){ goto out_of_bounds; }
-        if (cell_can_move_by(c, id, bias, dir)){
-            id = cell_move_by(c, id, bias, dir);
+        int bias = CHK_FLAG(c->mesh[*id].flags, CELL_BIAS) ? 1 : -1;
+        if (!move_in_bounds(*id, bias, dir)){ goto out_of_bounds; }
+        if (cell_can_move_by(c, *id, bias, dir)){
+            *id = cell_move_by(c, *id, bias, dir);
             goto moved;
         }
         // Otherwise try the other diagonal, and flip the bias
         else{
-            if (!move_in_bounds(id, -bias, -1)){ goto out_of_bounds; }
-            if (cell_can_move_by(c, id, -bias, dir)){
-                id = cell_move_by(c, id, -bias, dir);
+            if (!move_in_bounds(*id, -bias, -1)){ goto out_of_bounds; }
+            if (cell_can_move_by(c, *id, -bias, dir)){
+                *id = cell_move_by(c, *id, -bias, dir);
 
                 // Flip the bias (needed for dispersion)
-                TGL_FLAG(c->mesh[id].flags, CELL_BIAS);
-                bias = CHK_FLAG(c->mesh[id].flags, CELL_BIAS) ? 1 : -1;
+                TGL_FLAG(c->mesh[*id].flags, CELL_BIAS);
+                bias = CHK_FLAG(c->mesh[*id].flags, CELL_BIAS) ? 1 : -1;
                 
                 goto moved;
              }
@@ -220,8 +223,8 @@ int cell_update(struct chunk *c, size_t id){
 
         // If the cell does not have dispersion its stopped
         if (!props.dispersion){ 
-            if (CHK_FLAG(c->mesh[id+dir*CHUNK_SIZE].flags, CELL_STATIC) 
-                || CHK_FLAG(c->mesh[id+dir*CHUNK_SIZE].flags, CELL_SETTLED)){
+            if (CHK_FLAG(c->mesh[(*id)+dir*CHUNK_SIZE].flags, CELL_STATIC) 
+                || CHK_FLAG(c->mesh[(*id)+dir*CHUNK_SIZE].flags, CELL_SETTLED)){
                 goto settled;
             }
 
@@ -229,17 +232,17 @@ int cell_update(struct chunk *c, size_t id){
         }
 
         // Otherwise try to disperse horizontally
-        if (!move_in_bounds(id, bias, -1)){ goto out_of_bounds; }
-        if (cell_can_move_by(c, id, bias, 0)){
+        if (!move_in_bounds(*id, bias, -1)){ goto out_of_bounds; }
+        if (cell_can_move_by(c, *id, bias, 0)){
             goto disperse;
         }
 
         // Try to flip the bias and disperse the other way
         else {
-            if (!move_in_bounds(id, -bias, 0)) { goto out_of_bounds; }
-            if (cell_can_move_by(c, id, -bias, 0)){
+            if (!move_in_bounds(*id, -bias, 0)) { goto out_of_bounds; }
+            if (cell_can_move_by(c, *id, -bias, 0)){
                 bias = -bias;
-                TGL_FLAG(c->mesh[id].flags, CELL_BIAS);
+                TGL_FLAG(c->mesh[*id].flags, CELL_BIAS);
                 goto disperse;
             }
         }
@@ -248,10 +251,10 @@ int cell_update(struct chunk *c, size_t id){
         return 0;
     disperse:
         if (rand() % 255 >= props.dispersion) { goto moved; }
-        c->mesh[id].speed = 0;
-        id = cell_move_by(c, id, bias, 0);
+        c->mesh[*id].speed = 0;
+        *id = cell_move_by(c, *id, bias, 0);
         //goto moved;
-        c->mesh[id].speed+=20;
+        c->mesh[*id].speed+=20;
         travel--;
         continue;
     moved:
@@ -259,10 +262,10 @@ int cell_update(struct chunk *c, size_t id){
         continue;
     } 
     
-    c->mesh[id].speed = min(MAX_SPEED, c->mesh[id].speed+GRAVITY_ACCEL);
-    c->moved[id] = dir > 0;
-    CLR_FLAG(c->mesh[id].flags, CELL_SETTLED);
-    CLR_FLAG(c->mesh[id].flags, CELL_IDLED);
+    c->mesh[*id].speed = min(MAX_SPEED, c->mesh[*id].speed+GRAVITY_ACCEL);
+    c->moved[*id] = dir > 0;
+    CLR_FLAG(c->mesh[*id].flags, CELL_SETTLED);
+    CLR_FLAG(c->mesh[*id].flags, CELL_IDLED);
     return 1;
 
 stopped:
@@ -271,11 +274,11 @@ stopped:
 
 settled:
     //c->mesh[id].speed = props.dispersion>>2;
-    SET_FLAG(c->mesh[id].flags, CELL_SETTLED);
+    SET_FLAG(c->mesh[*id].flags, CELL_SETTLED);
     return 0;
 
 out_of_bounds:
-    c->mesh[id] = EMPTY_CELL;
+    c->mesh[*id] = EMPTY_CELL;
     return 1;
 }
 

@@ -1,46 +1,18 @@
 #pragma once
-#include <stdio.h>
-#include <stdlib.h>
-#include <memory.h>
-#include "glad/glad.h"
-#include "common.h"
+#include "shader.h"
 #include "sim.h"
-#include "sim_kinds.h"
+#include "common.h"
 
+#define SHADER_CELL_VERT "assets/cell_vert.glsl"
+#define SHADER_CELL_FRAG "assets/cell_frag.glsl"
 
-static const float SCREEN_QUAD[16] = {
-     1.0,  1.0, 1.0, 1.0,
-     1.0, -1.0, 1.0, 0.0,
-    -1.0, -1.0, 0.0, 0.0,
-    -1.0,  1.0, 0.0, 1.0
+enum renderer_type {
+    CellRenderer,
+    DebugRenderer,
 };
 
-static const unsigned int SCREEN_QUAD_IND[6] = {
-    0, 1, 3,
-    1, 2, 3
-};
+int renderer_draw(enum renderer_type rtype);
+int render_init();
+void render_destroy();
 
-struct render_data {
-    GLuint gl_program;
-    GLuint gl_vbo;
-    GLuint gl_ebo;
-    GLuint gl_vao;
-    GLuint gl_tex;
-};
-
-enum render_mode {
-    render_kinds,
-    render_flags,
-    render_density,
-    render_velocity,
-    render_updated,
-};
-
-
-void renderer_load_chunk(struct render_data *r, struct chunk *c); 
-int renderer_init(struct render_data *r, GLuint program);
-void renderer_draw(struct render_data *r);
-
-void renderer_set_mode(enum render_mode r);
-enum render_mode renderer_get_mode();
-
+void renderer_update_chunks(struct universe *c);

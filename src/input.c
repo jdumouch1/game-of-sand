@@ -11,7 +11,7 @@ struct input_hooks {
     int num_key_hooks;
 };
 
-static struct input_globals input;
+static struct input_globals globals;
 static struct input_hooks input_hooks = {
     .mouse_btn_hook = NULL,
     .num_mb_hooks = 0,
@@ -23,9 +23,6 @@ static struct input_hooks input_hooks = {
     .num_key_hooks = 0,
 };
 
-struct input_globals *get_input_globals(){
-    return &input;
-}
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -39,8 +36,8 @@ void input_key_callback(GLFWwindow *window, int key,
         }
     }
 
-    input.key_modifier = mods;
-    input.key[key] = action;
+    globals.key_modifier = mods;
+    globals.key[key] = action;
 
     for (int i = 0; i < input_hooks.num_key_hooks; i++){
         input_hooks.key_hook[i](key, action);
@@ -48,14 +45,14 @@ void input_key_callback(GLFWwindow *window, int key,
 }
 
 void input_cursor_pos_callback(GLFWwindow *window, double xpos, double ypos){
-    input.mouse_pos.x = max(min((uint16_t)(xpos), CHUNK_SIZE*2), 0);
-    input.mouse_pos.y = min(max((uint16_t) (CHUNK_SIZE*2)-ypos, 0), CHUNK_SIZE*2);
+    globals.mouse_pos.x = max(min((uint16_t)(xpos), CHUNK_SIZE*2), 0);
+    globals.mouse_pos.y = min(max((uint16_t) (CHUNK_SIZE*2)-ypos, 0), CHUNK_SIZE*2);
 }
 
 void input_mouse_button_callback(GLFWwindow *window, int button, 
                                  int action, int mods){
     if (button > 2) {return;}
-    input.mouse_btns[button] = action;
+    globals.mouse_btns[button] = action;
 
     for (int i = 0; i < input_hooks.num_mb_hooks; i++){
         input_hooks.mouse_btn_hook[i]((void*)0, (void*)0);
@@ -63,12 +60,25 @@ void input_mouse_button_callback(GLFWwindow *window, int button,
 }
 
 void input_scroll_callback(GLFWwindow *window, double xoffset, double yoffset){
-    input.scroll = (int) yoffset;
+    globals.scroll = (int) yoffset;
     for (int i = 0; i < input_hooks.num_scroll_hooks; i++){
         input_hooks.scroll_hook[i]((void*)0, (void*)0);
     }
 }
 
+static const struct input_callbacks callbacks = {
+    .key = &input_key_callback,
+    .cursor_pos = &input_cursor_pos_callback,
+    .mouse_button = &input_mouse_button_callback,
+    .input_scroll = &input_scroll_callback,
+};
+
+struct input_globals *input_get_globals(){
+    return &globals;
+}
+const struct input_callbacks *input_get_callbacks(){
+    return &callbacks;
+}
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic pop
 
