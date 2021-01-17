@@ -1,5 +1,4 @@
-#include "../include/shader.h"
-#include <stdio.h>
+#include "../../include/gfx/shader.h"
 
 int shader_program_from_files(GLuint *program, const char *vert_path, 
                               const char *frag_path) {

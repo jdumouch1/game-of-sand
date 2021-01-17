@@ -2,13 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "gfx.h"
+#include "gfx/gfx.h"
 #include "input.h"
-#include "render.h"
-#include "shader.h"
-#include "sim.h"
-#include "utils.h"
-
-#ifndef COMMON_HEADER_
-#include "common.h"
-#endif
+#include "gfx/render.h"
+#include "gfx/shader.h"
+#include "sim/sim.h"
+#include "common/utils.h"
+#include "common/common.h"

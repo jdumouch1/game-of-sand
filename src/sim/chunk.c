@@ -1,38 +1,5 @@
-#include "../include/sim.h"
-
-int cell_update(struct chunk *c, size_t *id);
-
-inline void id_to_uvec2(struct uvec2 *out, size_t local_id){
-    out->x = local_id % CHUNK_SIZE;
-    out->y = local_id >> CHUNK_SCALE;
-
-    // Note: CHUNK_SIZE is a power of two and division is optimized by
-    // using a left shift by Log2(CHUNK_SIZE), which happens to be CHUNK_SCALE
-}
-
-inline size_t uvec2_to_id(struct uvec2 *v){
-    return v->x + (v->y << CHUNK_SCALE);
-    
-    // Note: Id is calculated as the x + y * row_size, 
-    // y * row_size is optimized by using y << Log2(CHUNK_SIZE), known to be
-    // y << CHUNK_SCALE
-}
-
-inline int vec2_to_id(struct vec2 *v){
-    return v->x + (v->y << CHUNK_SCALE);
-}
-
-inline void id_to_vec2(struct vec2 *out, int id){
-    out->x = id % CHUNK_SIZE;
-    out->y = id >> CHUNK_SCALE;
-}
-
-// https://stackoverflow.com/questions/664852/which-is-the-fastest-way-to-get-the-absolute-value-of-a-number
-// by vicatu
-int32_t fast_abs(int32_t a){
-    uint32_t tmp = (a>>31);
-    return (a^tmp) + (tmp & 1); 
-}
+#include "../../include/sim/chunk.h"
+int chunk_update_cell(struct chunk *c, size_t *id);
 
 void chunk_set_rendered(struct chunk *c, struct render_chunk *rc){
     if (rc->sim_chunk){
@@ -51,10 +18,13 @@ void chunk_set_rendered(struct chunk *c, struct render_chunk *rc){
 
 void chunk_update(struct chunk *c){
     // Reset the cell updated states
-    memset(&c->moved, 0, sizeof(c->moved));
+    //memset(&c->moved, 0, sizeof(c->moved));
     // Set the chunk to inactive, in case no cells are updated.
     CLR_FLAG(c->flags, CHUNK_ACTIVE);
-    
+    for (int i = 0; i < CHUNK_AREA; i++){
+        CLR_FLAG(c->mesh[i].flags, CELL_UPDATED);
+    }
+
     int flipped_update = CHK_FLAG(c->flags, CHUNK_FLIP_UPDATE);
 
     int incrementor = flipped_update ? -1 : 1;
@@ -67,17 +37,19 @@ void chunk_update(struct chunk *c){
         struct cell *cell = &c->mesh[i];
         size_t id = i;
         
-        if (!c->moved[i] 
+        // Try to update the cell
+        if (!CHK_FLAG(c->mesh[i].flags, CELL_UPDATED)
             && c->mesh[i].kind
-            && !CHK_FLAG(cell->flags, CELL_SETTLED)
+//            && !CHK_FLAG(cell->flags, CELL_SETTLED)
             && !CHK_FLAG(cell->flags, CELL_STATIC)){
             
-            cell_update(c, &id);
+            chunk_update_cell(c, &id);
             
             // Set that has been an update in this chunk
             SET_FLAG(c->flags, CHUNK_ACTIVE);
         }
         
+        // Add to render_chunk if this chunk is on screen
         if (CHK_FLAG(c->flags, CHUNK_RENDERED) &&
             c->mesh[id].kind){
             struct render_chunk *rc = c->render_chunk;
@@ -87,11 +59,8 @@ void chunk_update(struct chunk *c){
             };
         }
         
-        // Check if 'i' needs to move to the end of a higher row
+        // jump up a row if flipped and at start of row
         if (flipped_update && !(i % CHUNK_SIZE)){
-            // (Current Row + 1) * Row_size = start of next row
-            // row_start + row_size = (end of next row+1)
-            // The extra +1 is decremented this iteration
             i = ((i/CHUNK_SIZE)+1)*CHUNK_SIZE + CHUNK_SIZE;
         } 
         i += incrementor;
@@ -100,26 +69,8 @@ void chunk_update(struct chunk *c){
     TGL_FLAG(c->flags, CHUNK_FLIP_UPDATE);
 }
 
-void unsettle_neighbours(struct chunk *c, size_t id){
-    if (id < CHUNK_AREA-CHUNK_SIZE){
-        CLR_FLAG(c->mesh[id + off_u].flags, CELL_SETTLED); 
-        CLR_FLAG(c->mesh[id + off_ul].flags, CELL_SETTLED); 
-        CLR_FLAG(c->mesh[id + off_ur].flags, CELL_SETTLED);
-    }
-    if (id < CHUNK_AREA){
-        CLR_FLAG(c->mesh[id + off_r].flags, CELL_SETTLED);
-    }
-    if (id > -1){
-        CLR_FLAG(c->mesh[id + off_l].flags, CELL_SETTLED);
-    }
-    if (id > CHUNK_SIZE){
-        CLR_FLAG(c->mesh[id + off_d].flags, CELL_SETTLED);
-        CLR_FLAG(c->mesh[id + off_dr].flags, CELL_SETTLED);
-        CLR_FLAG(c->mesh[id + off_dl].flags, CELL_SETTLED);
-    }
-}
 
-int cell_can_move_by(struct chunk *c, size_t from, int dx, int dy){
+int chunk_can_cell_move(struct chunk *c, size_t from, int dx, int dy){
     size_t to_id = from + dx + (dy << CHUNK_SCALE);
     struct kind_property from_props = kinds[c->mesh[from].kind];
     struct kind_property to_props = kinds[c->mesh[to_id].kind];
@@ -137,7 +88,7 @@ int cell_can_move_by(struct chunk *c, size_t from, int dx, int dy){
 }
 
 
-size_t cell_move_by(struct chunk *c, size_t from, int dx, int dy){
+size_t chunk_move_cell(struct chunk *c, size_t from, int dx, int dy){
     struct cell *cell = &c->mesh[from];
     struct cell tmp = c->mesh[from];
     struct cell *new_cell = &c->mesh[from + dx + (dy<<CHUNK_SCALE)];
@@ -146,13 +97,10 @@ size_t cell_move_by(struct chunk *c, size_t from, int dx, int dy){
     memcpy(new_cell, &tmp, sizeof(struct cell));
     cell = new_cell;
 
-    unsettle_neighbours(c, from);
+//    unsettle_neighbours(c, from);
     
     return from + dx + (dy<<CHUNK_SCALE);
 }
-
-
-
 
 int move_in_bounds(size_t id, int dx, int dy){
     int in_bounds = 1;
@@ -171,7 +119,7 @@ out:
     return in_bounds;
 }
 
-int cell_update(struct chunk *c, size_t *id){
+int chunk_update_cell(struct chunk *c, size_t *id){
     if (!c->mesh[*id].kind){
         SET_FLAG(c->mesh[*id].flags, CELL_SETTLED);
         goto stopped;
@@ -184,7 +132,6 @@ int cell_update(struct chunk *c, size_t *id){
         return 0;
     }
     
-    vec2 pos = { .x = *id % CHUNK_SIZE, .y = *id >> CHUNK_SCALE };
     const struct kind_property props = kinds[c->mesh[*id].kind];
 
     int dir = (props.density < 0) - (props.density > 0);
@@ -193,8 +140,8 @@ int cell_update(struct chunk *c, size_t *id){
 
     while (travel){
         if (!move_in_bounds(*id, 0, dir)){ goto out_of_bounds; }
-        if (cell_can_move_by(c, *id, 0, dir)){
-            *id = cell_move_by(c, *id, 0, dir);
+        if (chunk_can_cell_move(c, *id, 0, dir)){
+            *id = chunk_move_cell(c, *id, 0, dir);
             goto moved;
         }
         CLR_FLAG(c->mesh[*id].flags, CELL_FALLING); 
@@ -202,15 +149,15 @@ int cell_update(struct chunk *c, size_t *id){
         // Try diagonal movement towards the bias
         int bias = CHK_FLAG(c->mesh[*id].flags, CELL_BIAS) ? 1 : -1;
         if (!move_in_bounds(*id, bias, dir)){ goto out_of_bounds; }
-        if (cell_can_move_by(c, *id, bias, dir)){
-            *id = cell_move_by(c, *id, bias, dir);
+        if (chunk_can_cell_move(c, *id, bias, dir)){
+            *id = chunk_move_cell(c, *id, bias, dir);
             goto moved;
         }
         // Otherwise try the other diagonal, and flip the bias
         else{
             if (!move_in_bounds(*id, -bias, -1)){ goto out_of_bounds; }
-            if (cell_can_move_by(c, *id, -bias, dir)){
-                *id = cell_move_by(c, *id, -bias, dir);
+            if (chunk_can_cell_move(c, *id, -bias, dir)){
+                *id = chunk_move_cell(c, *id, -bias, dir);
 
                 // Flip the bias (needed for dispersion)
                 TGL_FLAG(c->mesh[*id].flags, CELL_BIAS);
@@ -233,14 +180,14 @@ int cell_update(struct chunk *c, size_t *id){
 
         // Otherwise try to disperse horizontally
         if (!move_in_bounds(*id, bias, -1)){ goto out_of_bounds; }
-        if (cell_can_move_by(c, *id, bias, 0)){
+        if (chunk_can_cell_move(c, *id, bias, 0)){
             goto disperse;
         }
 
         // Try to flip the bias and disperse the other way
         else {
             if (!move_in_bounds(*id, -bias, 0)) { goto out_of_bounds; }
-            if (cell_can_move_by(c, *id, -bias, 0)){
+            if (chunk_can_cell_move(c, *id, -bias, 0)){
                 bias = -bias;
                 TGL_FLAG(c->mesh[*id].flags, CELL_BIAS);
                 goto disperse;
@@ -252,7 +199,7 @@ int cell_update(struct chunk *c, size_t *id){
     disperse:
         if (rand() % 255 >= props.dispersion) { goto moved; }
         c->mesh[*id].speed = 0;
-        *id = cell_move_by(c, *id, bias, 0);
+        *id = chunk_move_cell(c, *id, bias, 0);
         //goto moved;
         c->mesh[*id].speed+=20;
         travel--;
@@ -263,9 +210,8 @@ int cell_update(struct chunk *c, size_t *id){
     } 
     
     c->mesh[*id].speed = min(MAX_SPEED, c->mesh[*id].speed+GRAVITY_ACCEL);
-    c->moved[*id] = dir > 0;
+    SET_FLAG(c->mesh[*id].flags, CELL_UPDATED);
     CLR_FLAG(c->mesh[*id].flags, CELL_SETTLED);
-    CLR_FLAG(c->mesh[*id].flags, CELL_IDLED);
     return 1;
 
 stopped:
@@ -282,10 +228,8 @@ out_of_bounds:
     return 1;
 }
 
-void set_cell(struct chunk *c, size_t id, struct cell new_cell){
+void chunk_set_cell(struct chunk *c, size_t id, struct cell new_cell){
     SET_FLAG(c->flags, CHUNK_ACTIVE);
     c->mesh[id] = new_cell;
-    unsettle_neighbours(c, id); 
+    //unsettle_neighbours(c, id); 
 }
-
-

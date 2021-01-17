@@ -1,7 +1,7 @@
 #pragma once
-#include "input.h"
-#include "render.h"
-#include "common.h"
+#include "../input.h"
+#include "../gfx/render.h"
+#include "../common/common.h"
 
 
 int gfx_init(GLFWwindow **window);

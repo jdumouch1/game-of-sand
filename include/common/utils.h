@@ -4,8 +4,21 @@
 
 #include "common.h"
 
-void linalg_ortho(float *matrix, int left, int right, int bottom, int top);
+typedef struct {
+    float m[16];
+} mat4;
 
+static const mat4 IDENTITY_MATRIX = {
+    .m = {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0,
+    },
+};
+mat4 lalg_cross(mat4 *m1, mat4 *m2);
+mat4 lalg_ortho(int left, int right, int bottom, int top);
+mat4 lalg_translation(float x, float y, float z);
 void shuffle(int *arr, size_t n);
 
 /*
@@ -23,3 +36,5 @@ void shuffle(int *arr, size_t n);
  * Incredible work by him, easily the most concise version I've seen.
 */
 void brensenham(vec2 *path, size_t *size, vec2 start, vec2 end);
+
+int32_t fast_abs(int32_t a);

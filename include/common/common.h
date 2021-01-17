@@ -1,7 +1,7 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
-#include "glad/gl.h"
+#include "../glad/gl.h"
 #include <GLFW/glfw3.h>
 
 
@@ -9,16 +9,16 @@
 #define CHUNK_SCALE 7
 #define POINT_SCALE 1
 #define SIM_SPEED 1
-#define RESOLUTION_X 1240
-#define RESOLUTION_Y 720
+#define RESOLUTION_X 800
+#define RESOLUTION_Y 600
 #define FULLSCREEN 0
 
 // Parameteric constants
 #define CHUNK_SIZE (1<<CHUNK_SCALE)
 #define CHUNK_AREA (CHUNK_SIZE * CHUNK_SIZE)
 #define POINT_SIZE (1<<POINT_SCALE)
-#define SCREEN_CHUNKS_X ((RESOLUTION_X>>POINT_SCALE)/CHUNK_SIZE + 1)
-#define SCREEN_CHUNKS_Y ((RESOLUTION_Y>>POINT_SCALE)/CHUNK_SIZE + 1)
+#define SCREEN_CHUNKS_X ((RESOLUTION_X>>POINT_SCALE)/CHUNK_SIZE + 2)
+#define SCREEN_CHUNKS_Y ((RESOLUTION_Y>>POINT_SCALE)/CHUNK_SIZE + 2)
 #define NUM_SCREEN_CHUNKS (SCREEN_CHUNKS_X * SCREEN_CHUNKS_Y)
 
 // Macros

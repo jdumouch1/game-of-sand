@@ -1,4 +1,4 @@
-#include "../include/gfx.h"
+#include "../../include/gfx/gfx.h"
 
 int gfx_init(GLFWwindow **window){
     glfwInit();

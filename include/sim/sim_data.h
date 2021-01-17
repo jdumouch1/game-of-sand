@@ -1,6 +1,10 @@
 #pragma once
 #include <stdint.h>
 
+// Sim parameters 
+#define MAX_SPEED 255
+#define GRAVITY_ACCEL 6
+
 enum kind {
     kind_air        = 0,
     kind_sand       = 1,
@@ -73,3 +77,5 @@ static const struct kind_property kinds[] = {
         .friction = 240,       
     }
 };
+
+

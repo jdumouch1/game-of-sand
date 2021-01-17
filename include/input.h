@@ -1,5 +1,5 @@
 #pragma once
-#include "sim.h"
+#include "sim/sim.h"
 #include <stdio.h>
 #include <GLFW/glfw3.h>
 

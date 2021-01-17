@@ -11,12 +11,10 @@
 - Brush visualization
 
 ## Rendering
-- Cameras
 - Chunk swapping
 - Render modes
 - Create debug renderer
 - Linear algebra (expand)
-- MVP matrix
 
 ## Longshots
 - Post-processing

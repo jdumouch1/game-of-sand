@@ -1,10 +1,7 @@
 #pragma once
 #include <stdio.h>
 #include <stdlib.h>
-
-#ifndef COMMON_HEADER_
-#include "common.h"
-#endif
+#include "../common/common.h"
 
 
 #ifdef DEBUG

@@ -1,12 +1,13 @@
 #include "../include/gos.h"
+#include <GLFW/glfw3.h>
 
-static int brush_size = 15;
+static int brush_size = 4;
 static int brush_kind = kind_sand;
 static struct input_globals *input;
 
 void on_scroll(){
     if (input->key[GLFW_KEY_SPACE]){
-        brush_size = max(brush_size + input->scroll*5, 0);
+        brush_size = max(brush_size + input->scroll*3, 0);
         printf("Brush size: %d\n", brush_size);
     }
     else {
@@ -36,31 +37,16 @@ void on_key(int key, int action){
                 (1 + (4*(input->key_modifier&GLFW_MOD_SHIFT))));
         printf("Brush size: %d\n", brush_size);
         break;
-    /*case GLFW_KEY_R:
+    case GLFW_KEY_W:
+    case GLFW_KEY_A:
+    case GLFW_KEY_S:
+    case GLFW_KEY_D:
         {
-            enum render_mode rm = renderer_get_mode()+1;
-            if (rm >= 4){rm = 0;}
-            renderer_set_mode(rm);
-
-            printf("Render mode: ");
-            switch (rm){
-            case render_kinds:
-                printf("default\n");
-                break;
-            case render_flags:
-                printf("flags\n");
-                break;
-            case render_density:
-                printf("density\n");
-                break;
-            case render_velocity:
-                printf("velocity\n");
-                break;
-            default:
-                printf("Invalid.\n");
-            }
+            vec2 *cam = render_camera();
+            cam->x += ((key == GLFW_KEY_A) - (key == GLFW_KEY_D)) * 15;
+            cam->y -= ((key == GLFW_KEY_W) - (key == GLFW_KEY_S)) * 15;
         }
-        break;*/
+        break;
     case GLFW_KEY_0:
         brush_kind = 0;
         goto print_brush;
@@ -81,17 +67,30 @@ void on_key(int key, int action){
     }
 
     return;
+
 print_brush:
     printf("Brush kind: %s\n", kinds[brush_kind].name);
+    return;
 }
 
-void paint_at(struct chunk *c, struct uvec2 *pos, 
+void paint_at(struct universe *u, struct uvec2 *pos, 
               uint16_t kind, uint16_t flags){
+    vec2 chunk_pos = { .x = pos->x / (CHUNK_SIZE*POINT_SIZE),
+                       .y = pos->y / (CHUNK_SIZE*POINT_SIZE)};
+    struct chunk *c = {0};
+    for (size_t i = 0; i < u->num_chunks; i++){
+        if (u->grid[i].pos.x == chunk_pos.x &&
+            u->grid[i].pos.y == chunk_pos.y){
+            c = &u->grid[i];
+            break;
+        }
+    }
+    if (!c){return;} 
     for (int y = 0; y < brush_size; y++){
         for (int x = 0; x < brush_size; x++){
             struct vec2 draw_pos = {
-                .x = (int)(pos->x/2) + x - brush_size/2,
-                .y = (int)(pos->y/2) + y - brush_size/2,
+                .x = (int)(pos->x%(CHUNK_SIZE*POINT_SIZE))/2 + x - brush_size/2,
+                .y = (int)(pos->y%(CHUNK_SIZE*POINT_SIZE))/2 + y - brush_size/2,
             };
             if (draw_pos.x < 0 || draw_pos.x > CHUNK_SIZE-1
                 || draw_pos.y < 0 || draw_pos.y > CHUNK_SIZE-1) { 
@@ -107,12 +106,14 @@ void paint_at(struct chunk *c, struct uvec2 *pos,
             if (rand()%2){
                 SET_FLAG(cell_data.flags, CELL_BIAS);
             }
-            set_cell(c, id, cell_data);
+            chunk_set_cell(c, id, cell_data);
         }
     }
 }
 
 int main() {
+    printf("Chunk bytes: %lu, Cell bytes: %lu\n", 
+            sizeof(struct chunk), sizeof(struct cell));
     printf("Chunk size: %d, Point size: %d\n", CHUNK_SIZE, POINT_SIZE);
     printf("Displayed chunks: (%d, %d) [total: %d]\n", 
             SCREEN_CHUNKS_X, SCREEN_CHUNKS_Y, NUM_SCREEN_CHUNKS);
@@ -130,15 +131,22 @@ int main() {
     
     // Compile and link shaders
 
-    struct universe u;
-    u.grid = calloc(1, sizeof(struct chunk));
-    u.grid[0].pos = (vec2) { .x = 0, .y = 0 };
+    struct universe u = {0};
+    u.grid = calloc(NUM_SCREEN_CHUNKS, sizeof(struct chunk));
+    if (!u.grid){ return 1; }
+
+    for (int i = 0; i < NUM_SCREEN_CHUNKS; ++i){
+        vec2 pos = { .x = i % SCREEN_CHUNKS_X,
+                     .y = i / SCREEN_CHUNKS_X };
+        universe_spawn_chunk(&u, pos);
+    }
     SET_FLAG(u.grid[0].flags, CHUNK_ACTIVE);
 
     size_t fps = 0;
     double last_fps_post = 0.0;
     double frame_since_sim = 0.0;
     while (!glfwWindowShouldClose(window)){
+        double update_start = glfwGetTime();
         fps++;
         frame_since_sim++;
         if (glfwGetTime() - last_fps_post >= 1.0){
@@ -151,7 +159,7 @@ int main() {
         pos.x/=2; pos.y/=2;
 
         if (input->key[GLFW_KEY_Q] == GLFW_PRESS){
-            memset(&u.grid[0], 0, sizeof(struct chunk));
+            memset(u.grid, 0, sizeof(struct chunk)*NUM_SCREEN_CHUNKS);
             SET_FLAG(u.grid[0].flags, CHUNK_ACTIVE);
         }else if(input->key[GLFW_KEY_R] == GLFW_PRESS){
             SET_FLAG(u.grid[0].flags, CHUNK_ACTIVE);
@@ -159,28 +167,44 @@ int main() {
         
         if (frame_since_sim >= 1.0/SIM_SPEED){
             frame_since_sim = 0.0;
-            if (CHK_FLAG(u.grid[0].flags, CHUNK_ACTIVE)){
-                chunk_update(&u.grid[0]);
+                double start = glfwGetTime(); 
+            for (int i = 0; i < NUM_SCREEN_CHUNKS; i++){
+                if (CHK_FLAG(u.grid[i].flags, CHUNK_ACTIVE)){
+                    chunk_update(&u.grid[i]);
+                }
+            }
+            if (fps==1){
+                printf("Sim time per frame: %fms\n", 
+                        (glfwGetTime()-start) * 1000);
             }
 
             if (input->mouse_btns[GLFW_MOUSE_BUTTON_1] == GLFW_PRESS){
-                paint_at(&u.grid[0], &input->mouse_pos, 
-                         brush_kind, 0); 
+                for (int i = 0; i < NUM_SCREEN_CHUNKS; i++){
+                    paint_at(&u, &input->mouse_pos, 
+                             brush_kind, 0); 
+                }
             }
             if (input->mouse_btns[GLFW_MOUSE_BUTTON_2] == GLFW_PRESS){
-                paint_at(&u.grid[0], &input->mouse_pos, 
-                         kind_stone, CELL_STATIC);
+                for (int i = 0; i < NUM_SCREEN_CHUNKS; i++){
+                    paint_at(&u, &input->mouse_pos, 
+                             kind_stone, CELL_STATIC);
+                }
 
             }
-            renderer_update_chunks(&u);
+            render_update_chunks(&u);
         }
 
         glClear(GL_COLOR_BUFFER_BIT);
        
-        renderer_draw(CellRenderer);
-
+        render_draw();
+        if (!fps){
+            printf("Update time: %fms\n", 
+                    (glfwGetTime()-update_start) * 1000);
+        }
         glfwSwapBuffers(window);
         
+
+
         glfwPollEvents();
     }
     
